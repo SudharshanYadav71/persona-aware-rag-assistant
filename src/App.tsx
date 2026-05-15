@@ -6,7 +6,7 @@ import {
 import { 
   Brain, Send, History, AlertCircle, Database, RefreshCw, 
   Smile, User, Settings, ShieldCheck, ChevronRight, LayoutDashboard,
-  Zap, Activity, Lock, Globe, Bell, Share2, Download, Trash2, Heart, Frown, Meh, BarChart3, X
+  Zap, Activity, Lock, Globe, Bell, Share2, Download, Trash2, Heart, Frown, Meh, BarChart3, X, Menu
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
@@ -44,6 +44,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'chat' | 'persona' | 'memories' | 'graph' | 'analytics' | 'sync' | 'engine'>('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
   const [showDocModal, setShowDocModal] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (token) {
@@ -252,22 +253,41 @@ export default function App() {
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] mix-blend-overlay"></div>
       </div>
 
+      {/* Mobile Overlay Backdrop */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 z-40 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Floating Sidebar */}
-      <aside className="relative z-30 w-full md:w-72 p-6 flex flex-col gap-8 border-r border-white/5 backdrop-blur-3xl bg-black/20">
-        <div className="flex items-center gap-4 px-2">
-          <div className="relative">
-            <div className="absolute inset-0 bg-indigo-500 blur-lg opacity-40 animate-pulse"></div>
-            <div className="relative w-12 h-12 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-2xl flex items-center justify-center text-white shadow-2xl">
-              <Brain className="w-7 h-7" />
+      <aside className={cn(
+        "fixed md:relative z-50 md:z-30 w-72 h-full p-6 flex flex-col gap-8 border-r border-white/5 backdrop-blur-3xl bg-[#08090d]/95 md:bg-black/20 transition-transform duration-300 ease-in-out",
+        sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+      )}>
+        <div className="flex items-center justify-between px-2">
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <div className="absolute inset-0 bg-indigo-500 blur-lg opacity-40 animate-pulse"></div>
+              <div className="relative w-12 h-12 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-2xl flex items-center justify-center text-white shadow-2xl">
+                <Brain className="w-7 h-7" />
+              </div>
+            </div>
+            <div>
+              <h1 className="font-bold text-xl tracking-tight text-white">Persona AI</h1>
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
+                <p className="text-[10px] text-emerald-400 font-bold tracking-widest uppercase">System Online</p>
+              </div>
             </div>
           </div>
-          <div>
-            <h1 className="font-bold text-xl tracking-tight text-white">Persona AI</h1>
-            <div className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
-              <p className="text-[10px] text-emerald-400 font-bold tracking-widest uppercase">System Online</p>
-            </div>
-          </div>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="md:hidden p-2 text-white/60 hover:text-white transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         <nav className="flex flex-col gap-1.5">
@@ -283,7 +303,7 @@ export default function App() {
           ].map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => { setActiveTab(tab.id as any); setSidebarOpen(false); }}
               className={cn(
                 "group relative flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all duration-500",
                 activeTab === tab.id 
@@ -332,7 +352,14 @@ export default function App() {
       {/* Main Container */}
       <main className="relative z-10 flex-1 flex flex-col h-screen overflow-hidden">
         {/* Futuristic Header */}
-        <header className="h-20 border-b border-white/5 flex items-center justify-between px-10 shrink-0 backdrop-blur-md bg-black/10">
+        <header className="h-16 md:h-20 border-b border-white/5 flex items-center justify-between px-4 md:px-10 shrink-0 backdrop-blur-md bg-black/10">
+          {/* Mobile hamburger */}
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="md:hidden p-2 text-white/60 hover:text-white transition-colors mr-2"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 text-indigo-400/60">
               <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Platform</span>
@@ -371,12 +398,12 @@ export default function App() {
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.98 }}
-                className="p-10 max-w-7xl mx-auto w-full space-y-8"
+                className="p-4 md:p-10 max-w-7xl mx-auto w-full space-y-6 md:space-y-8"
               >
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div>
-                    <h1 className="text-4xl font-extrabold tracking-tight text-white mb-2">Cognitive Storage Engine</h1>
-                    <p className="text-slate-400 font-medium">SQLite-based long-term memory optimization and state management.</p>
+                    <h1 className="text-2xl md:text-4xl font-extrabold tracking-tight text-white mb-2">Cognitive Storage Engine</h1>
+                    <p className="text-slate-400 font-medium text-sm md:text-base">SQLite-based long-term memory optimization and state management.</p>
                   </div>
                   <button 
                     onClick={async () => {
@@ -426,7 +453,7 @@ export default function App() {
                   ))}
                 </div>
 
-                <div className="flex gap-6">
+                <div className="flex flex-col lg:flex-row gap-6">
                   <div className="flex-1 p-8 rounded-3xl bg-white/5 border border-white/10 space-y-6">
                     <h2 className="text-xl font-bold text-white flex items-center gap-2">
                        <ShieldCheck className="w-5 h-5 text-indigo-400" />
@@ -450,7 +477,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="w-80 p-8 rounded-3xl bg-white/5 border border-white/10 space-y-6">
+                  <div className="w-full lg:w-80 p-6 md:p-8 rounded-3xl bg-white/5 border border-white/10 space-y-6">
                     <h2 className="text-xl font-bold text-white">Pruning Policy</h2>
                     <p className="text-xs text-white/40 leading-relaxed font-medium">Sensory memories with importance below 0.3 are automatically pruned after 24 hours to maintain cognitive efficiency.</p>
                     <div className="pt-4 border-t border-white/5">
@@ -473,12 +500,12 @@ export default function App() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-                className="p-10 max-w-7xl mx-auto w-full space-y-10 pb-20"
+                className="p-4 md:p-10 max-w-7xl mx-auto w-full space-y-6 md:space-y-10 pb-20"
               >
                 {/* Hero Section */}
                 <section className="relative group">
                   <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-blue-600 rounded-3xl blur opacity-10 group-hover:opacity-20 transition duration-1000 group-hover:duration-200"></div>
-                  <div className="relative backdrop-blur-3xl bg-white/[0.03] border border-white/10 rounded-[2.5rem] p-12 overflow-hidden">
+                  <div className="relative backdrop-blur-3xl bg-white/[0.03] border border-white/10 rounded-[1.5rem] md:rounded-[2.5rem] p-6 md:p-12 overflow-hidden">
                     <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-indigo-500/5 blur-[100px] rounded-full -translate-y-1/2 translate-x-1/2"></div>
                     
                     <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
@@ -490,11 +517,11 @@ export default function App() {
                         >
                           <span className="px-3 py-1 bg-indigo-500/10 text-indigo-400 text-[10px] font-bold tracking-[0.2em] uppercase rounded-full border border-indigo-500/20">Version 2.4.0 (Beta)</span>
                         </motion.div>
-                        <h2 className="text-5xl font-black text-white leading-tight mb-6">
+                        <h2 className="text-3xl md:text-5xl font-black text-white leading-tight mb-4 md:mb-6">
                           Neural Cognition <br />
                           <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-blue-300">Simplified.</span>
                         </h2>
-                        <p className="text-slate-400 text-lg leading-relaxed max-w-md mb-10 font-medium">
+                        <p className="text-slate-400 text-sm md:text-lg leading-relaxed max-w-md mb-6 md:mb-10 font-medium">
                           Experience the next generation of persona-aware memory management. Privacy-first, offline-indexed, and emotionally intelligent.
                         </p>
                         <div className="flex flex-wrap gap-4">
@@ -514,7 +541,7 @@ export default function App() {
                         </div>
                       </div>
 
-                      <div className="relative flex justify-center items-center">
+                      <div className="relative flex justify-center items-center hidden lg:flex">
                         <div className="w-64 h-64 relative">
                           <div className="absolute inset-0 bg-indigo-500 rounded-full blur-[60px] opacity-20 animate-pulse"></div>
                           <motion.div 
@@ -630,13 +657,13 @@ export default function App() {
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.98 }}
-                className="p-10 h-full flex flex-col gap-8 max-w-5xl mx-auto w-full"
+                className="p-3 md:p-10 h-full flex flex-col gap-4 md:gap-8 max-w-5xl mx-auto w-full"
               >
-                <div className="flex-1 backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden relative group">
+                <div className="flex-1 backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-[1.5rem] md:rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden relative group">
                   <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/5 to-transparent pointer-events-none"></div>
                   
                   {/* Message Interface */}
-                  <div className="flex-1 overflow-auto p-10 space-y-6 custom-scrollbar scroll-smooth">
+                  <div className="flex-1 overflow-auto p-4 md:p-10 space-y-4 md:space-y-6 custom-scrollbar scroll-smooth">
                     {messages.length === 0 && (
                       <div className="h-full flex flex-col items-center justify-center text-center space-y-8 py-20">
                         <div className="relative">
@@ -646,7 +673,7 @@ export default function App() {
                           </div>
                         </div>
                         <div className="space-y-4">
-                          <h3 className="text-3xl font-black text-white tracking-tight">How shall we evolve today?</h3>
+                          <h3 className="text-xl md:text-3xl font-black text-white tracking-tight">How shall we evolve today?</h3>
                           <p className="text-slate-400 max-w-md mx-auto text-sm leading-relaxed font-medium">
                             Our memory bank is empty. Start a session to initialize adaptive RAG patterns and persona drift tracking.
                           </p>
@@ -742,7 +769,7 @@ export default function App() {
                   </div>
                   
                   {/* Intelligent Input */}
-                  <div className="p-8 border-t border-white/5 bg-black/20">
+                  <div className="p-3 md:p-8 border-t border-white/5 bg-black/20">
                     <div className="relative group/input">
                       <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-blue-600 rounded-2xl blur opacity-0 group-focus-within/input:opacity-20 transition duration-500"></div>
                       <div className="relative">
@@ -752,7 +779,7 @@ export default function App() {
                           onChange={(e) => setInput(e.target.value)}
                           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                           placeholder="Command your memory engine..."
-                          className="w-full bg-white/5 border border-white/10 rounded-2xl py-5 pl-8 pr-32 text-white shadow-2xl focus:bg-white/[0.08] focus:border-indigo-500/50 outline-none transition-all placeholder:text-slate-600"
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 md:py-5 pl-4 md:pl-8 pr-24 md:pr-32 text-sm md:text-base text-white shadow-2xl focus:bg-white/[0.08] focus:border-indigo-500/50 outline-none transition-all placeholder:text-slate-600"
                         />
                         <div className="absolute right-3 top-2.5 bottom-2.5 flex items-center gap-2">
                            <button className="p-3 text-slate-500 hover:text-white transition-colors">
@@ -781,7 +808,7 @@ export default function App() {
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.98 }}
-                className="p-10 max-w-7xl mx-auto w-full space-y-10 pb-20"
+                className="p-4 md:p-10 max-w-7xl mx-auto w-full space-y-6 md:space-y-10 pb-20"
               >
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                    <div>
