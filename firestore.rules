@@ -1,0 +1,75 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Memory Validation
+    function isValidMemory(data) {
+      return data.userId is string &&
+             data.content is string && data.content.size() <= 5000 &&
+             data.timestamp is int &&
+             (data.emotionalWeight == null || data.emotionalWeight is number);
+    }
+
+    // PersonaDaily Validation
+    function isValidPersona(data) {
+      return data.userId is string &&
+             data.day is string &&
+             data.traits is list;
+    }
+
+    // IntentLog Validation
+    function isValidIntent(data) {
+      return data.userId is string &&
+             data.text is string &&
+             data.intent is string;
+    }
+
+    // User collections
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      
+      match /memories/{memoryId} {
+        allow read, list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidMemory(request.resource.data);
+        allow update: if isOwner(userId) && isValidMemory(request.resource.data) &&
+                      request.resource.data.userId == resource.data.userId;
+        allow delete: if isOwner(userId);
+      }
+
+      match /persona_history/{dayId} {
+        allow read, list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidPersona(request.resource.data);
+        allow update: if isOwner(userId) && isValidPersona(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      match /intent_logs/{intentId} {
+        allow read, list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidIntent(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      match /config/{configId} {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId);
+      }
+    }
+  }
+}

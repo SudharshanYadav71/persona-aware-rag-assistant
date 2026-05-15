@@ -1,0 +1,6 @@
+{
+  "name": "Persona-Aware RAG Assistant",
+  "description": "An adaptive memory AI assistant featuring persona drift detection, offline intent classification, and conflict-aware RAG memory resolver with Firebase sync.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

@@ -1,0 +1,79 @@
+{
+  "entities": {
+    "Memory": {
+      "title": "Memory",
+      "description": "A semantic memory chunk with metadata for RAG and conflict resolution.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "content": { "type": "string" },
+        "embedding": { "type": "array" },
+        "timestamp": { "type": "integer" },
+        "emotionalWeight": { "type": "number" },
+        "tags": { "type": "array" },
+        "source": { "type": "string" },
+        "isContradictory": { "type": "boolean" },
+        "resolution": { "type": "string" }
+      },
+      "required": ["userId", "content", "timestamp"]
+    },
+    "PersonaDaily": {
+      "title": "PersonaDaily",
+      "description": "Daily snapshot of the user's persona traits.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "day": { "type": "string" },
+        "traits": { "type": "array" },
+        "sentiment": { "type": "number" },
+        "formality": { "type": "number" },
+        "emotion": { "type": "string" },
+        "topTrigger": { "type": "string" },
+        "emojiUsage": { "type": "number" }
+      },
+      "required": ["userId", "day", "traits"]
+    },
+    "IntentLog": {
+      "title": "IntentLog",
+      "description": "Log of detected intents from user interactions.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "text": { "type": "string" },
+        "intent": { "type": "string" },
+        "confidence": { "type": "number" },
+        "timestamp": { "type": "integer" }
+      },
+      "required": ["userId", "text", "intent"]
+    },
+    "UserConfig": {
+      "title": "UserConfig",
+      "description": "User specific configurations and sync state.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "lastSyncTimestamp": { "type": "integer" },
+        "encryptionEnabled": { "type": "boolean" }
+      },
+      "required": ["userId"]
+    }
+  },
+  "firestore": {
+    "users/{userId}/memories": {
+      "schema": "Memory",
+      "description": "User specific memories for RAG."
+    },
+    "users/{userId}/persona_history": {
+      "schema": "PersonaDaily",
+      "description": "User persona drift tracking."
+    },
+    "users/{userId}/intent_logs": {
+      "schema": "IntentLog",
+      "description": "User intent classification history."
+    },
+    "users/{userId}/config": {
+      "schema": "UserConfig",
+      "description": "User system configuration."
+    }
+  }
+}
