@@ -10,3 +10,8 @@ services:
         value: production
       - key: JWT_SECRET
         generateValue: true
+      - key: FIRESTORE_DATABASE_ID
+        value: ai-studio-668a4b1c-f2d0-4965-8a47-9361982ff4c9
+      # FIREBASE_SERVICE_ACCOUNT: Set this in Render dashboard as a base64-encoded service account JSON
+      # to enable Firestore sync. Run: base64 -w 0 your-service-account.json
+      # The app works without it — Firebase sync is optional.

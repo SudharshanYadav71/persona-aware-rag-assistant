@@ -22,25 +22,46 @@ import {
 // Ensure models directory exists
 if (!fs.existsSync('./models')) fs.mkdirSync('./models');
 
-// Load Firebase Config
-const firebaseConfig = JSON.parse(fs.readFileSync("./firebase-applet-config.json", "utf-8"));
-
+// Load Firebase Config — support both file-based (local) and env-var-based (Render/production)
+let firebaseConfig: any = {};
 let adminApp: admin.app.App | undefined;
 let fbDb: any;
 
 try {
-  // Check if app is already initialized
-  if (admin.apps.length === 0) {
-    adminApp = admin.initializeApp({
-      credential: admin.credential.applicationDefault(),
-      projectId: firebaseConfig.projectId
-    });
+  // Prefer env var (base64-encoded service account JSON) for production deployments
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    const serviceAccount = JSON.parse(
+      Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT, 'base64').toString('utf-8')
+    );
+    firebaseConfig = {
+      projectId: serviceAccount.project_id,
+      firestoreDatabaseId: process.env.FIRESTORE_DATABASE_ID || '(default)'
+    };
+    if (admin.apps.length === 0) {
+      adminApp = admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+        projectId: serviceAccount.project_id
+      });
+    } else {
+      adminApp = admin.apps[0]!;
+    }
+    fbDb = getFirestore(adminApp, firebaseConfig.firestoreDatabaseId);
+    console.log(`[Firebase] Initialized via env var for project: ${firebaseConfig.projectId}`);
+  } else if (fs.existsSync("./firebase-applet-config.json")) {
+    firebaseConfig = JSON.parse(fs.readFileSync("./firebase-applet-config.json", "utf-8"));
+    if (admin.apps.length === 0) {
+      adminApp = admin.initializeApp({
+        credential: admin.credential.applicationDefault(),
+        projectId: firebaseConfig.projectId
+      });
+    } else {
+      adminApp = admin.apps[0]!;
+    }
+    fbDb = getFirestore(adminApp, firebaseConfig.firestoreDatabaseId);
+    console.log(`[Firebase] Initialized via config file for project: ${firebaseConfig.projectId} | DB: ${firebaseConfig.firestoreDatabaseId}`);
   } else {
-    adminApp = admin.apps[0]!;
+    console.warn("[Firebase] No config found (file or env var). Sync features disabled.");
   }
-  
-  fbDb = getFirestore(adminApp, firebaseConfig.firestoreDatabaseId);
-  console.log(`[Firebase] Initialized for project: ${firebaseConfig.projectId} | DB: ${firebaseConfig.firestoreDatabaseId}`);
 } catch (error) {
   console.error("Firebase Admin initialization failed. Sync features will be disabled.", error);
 }
@@ -578,9 +599,27 @@ app.get("/api/test-pipeline", async (req, res) => {
 });
 
 async function startServer() {
-  // Train on start
-  await trainIntentClassifier();
-  
+  // Only train if the model file doesn't already exist (avoids slow re-training on every cold start)
+  if (!fs.existsSync('./models/intent_model.json')) {
+    console.log("[Startup] Intent model not found — training now...");
+    try {
+      await trainIntentClassifier();
+    } catch (e) {
+      console.error("[Startup] Training failed:", e);
+    }
+  } else {
+    console.log("[Startup] Intent model found — skipping training.");
+  }
+
+  // Register health + favicon BEFORE the SPA wildcard so they are reachable in production
+  app.get("/favicon.ico", (_req, res) => {
+    res.status(204).end();
+  });
+
+  app.get("/health", (_req, res) => {
+    res.json({ status: "ok", uptime: process.uptime(), timestamp: Date.now() });
+  });
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true, hmr: false },
@@ -590,18 +629,11 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
+    // SPA fallback — must be last
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
-
-  app.get("/favicon.ico", (_req, res) => {
-    res.status(204).end();
-  });
-
-  app.get("/health", (_req, res) => {
-    res.json({ status: "ok", uptime: process.uptime(), timestamp: Date.now() });
-  });
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
