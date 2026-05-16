@@ -18,6 +18,10 @@ let sentimentModelReady = false;
 
 // Load sentiment model in background — never block requests
 (async () => {
+  if (process.env.NODE_ENV === 'production') {
+    console.log('[PersonaEngine] Production mode active. Skipping heavy ML model (OOM prevention) and using fast heuristics.');
+    return;
+  }
   try {
     sentimentPipeline = await pipeline('sentiment-analysis', 'Xenova/distilbert-base-uncased-finetuned-sst-2-english');
     sentimentModelReady = true;

@@ -9,6 +9,10 @@ let nliModelReady = false;
 
 // Load NLI model in background — never block requests
 (async () => {
+  if (process.env.NODE_ENV === 'production') {
+    console.log('[NLI] Production mode active. Skipping heavy ML model (OOM prevention) and using fast heuristics.');
+    return;
+  }
   try {
     classifier = await pipeline('text-classification', 'Xenova/distilbert-base-uncased-mnli');
     nliModelReady = true;
