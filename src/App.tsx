@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   AreaChart, Area, BarChart, Bar, Cell, PieChart, Pie
@@ -672,19 +672,38 @@ export default function App() {
                             <Brain className="w-12 h-12" />
                           </div>
                         </div>
-                        <div className="space-y-4">
-                          <h3 className="text-xl md:text-3xl font-black text-white tracking-tight">How shall we evolve today?</h3>
-                          <p className="text-slate-400 max-w-md mx-auto text-sm leading-relaxed font-medium">
-                            Our memory bank is empty. Start a session to initialize adaptive RAG patterns and persona drift tracking.
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap justify-center gap-3">
-                          {['Analyze my tone', 'Recall recent tasks', 'Sentiment check'].map(suggestion => (
-                            <button key={suggestion} onClick={() => setInput(suggestion)} className="px-5 py-2.5 bg-white/5 border border-white/10 rounded-xl text-xs font-bold text-indigo-300 hover:bg-indigo-500/10 hover:border-indigo-500/30 transition-all">
-                              {suggestion}
-                            </button>
-                          ))}
-                        </div>
+                        <div className="space-y-3">
+                           <h3 className="text-xl md:text-3xl font-black text-white tracking-tight">How shall we evolve today?</h3>
+                           <p className="text-slate-400 max-w-lg mx-auto text-sm leading-relaxed font-medium">
+                             Start by <span className="text-indigo-400 font-bold">storing a memory</span>, then <span className="text-emerald-400 font-bold">query the vault</span> to see the full RAG pipeline in action.
+                           </p>
+                         </div>
+                         <div className="w-full max-w-xl space-y-3">
+                           <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest text-center">Store memories first</p>
+                           <div className="flex flex-wrap justify-center gap-2">
+                             {[
+                               'My sister lives in Hyderabad',
+                               'My favorite language is Python',
+                               'I work as an AI engineer',
+                             ].map(s => (
+                               <button key={s} onClick={() => setInput(s)} className="px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-xs font-bold text-indigo-300 hover:bg-indigo-500/20 transition-all">
+                                 {s}
+                               </button>
+                             ))}
+                           </div>
+                           <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest text-center pt-2">Then query the vault</p>
+                           <div className="flex flex-wrap justify-center gap-2">
+                             {[
+                               'Did I mention my sister?',
+                               'Do you remember my favorite language?',
+                               'What do you know about my job?',
+                             ].map(s => (
+                               <button key={s} onClick={() => setInput(s)} className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs font-bold text-emerald-300 hover:bg-emerald-500/20 transition-all">
+                                 {s}
+                               </button>
+                             ))}
+                           </div>
+                         </div>
                       </div>
                     )}
 

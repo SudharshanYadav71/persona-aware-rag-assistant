@@ -237,7 +237,7 @@ export class MemoryStore {
       }
       const keywordScore = Math.min(1, overlap / 3);
 
-      const finalScore = (0.5 * similarity) + (0.3 * recencyScore) + (0.2 * importanceValue);
+      const finalScore = (0.40 * similarity) + (0.25 * keywordScore) + (0.20 * recencyScore) + (0.15 * importanceValue);
       
       return {
         ...m,
