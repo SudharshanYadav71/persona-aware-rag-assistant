@@ -14,32 +14,59 @@ export interface PersonaProfile {
 }
 
 let sentimentPipeline: any = null;
+let sentimentModelReady = false;
 
-async function getSentimentPipeline() {
-  if (!sentimentPipeline) {
+// Load sentiment model in background — never block requests
+(async () => {
+  try {
     sentimentPipeline = await pipeline('sentiment-analysis', 'Xenova/distilbert-base-uncased-finetuned-sst-2-english');
+    sentimentModelReady = true;
+    console.log('[PersonaEngine] Sentiment model loaded.');
+  } catch (e) {
+    console.warn('[PersonaEngine] Sentiment model unavailable, using heuristic fallback:', (e as any)?.message);
   }
-  return sentimentPipeline;
+})();
+
+/**
+ * Heuristic sentiment analysis — no model required.
+ * Returns a value in [-1, 1].
+ */
+function heuristicSentiment(text: string): number {
+  const lower = text.toLowerCase();
+  const positive = ['love', 'happy', 'great', 'awesome', 'good', 'excited', 'fantastic', 'excellent', 'wonderful', 'amazing', 'best', 'like', 'enjoy', 'fun', 'nice', 'glad', 'pleased', 'fantastic', 'brilliant'];
+  const negative = ['hate', 'bad', 'sad', 'worst', 'terrible', 'awful', 'horrible', 'frustrated', 'angry', 'stressed', 'anxious', 'worried', 'upset', 'disappointed', 'depressed', 'lonely', 'tired', 'exhausted', 'fail', 'failed'];
+  let score = 0;
+  positive.forEach(w => { if (lower.includes(w)) score += 0.2; });
+  negative.forEach(w => { if (lower.includes(w)) score -= 0.2; });
+  return Math.max(-1, Math.min(1, score));
 }
 
 export class PersonaEngine {
   /**
    * Analyzes a single message and updates the rolling persona profile.
+   * Falls back to heuristics if the sentiment model is not ready.
    */
   async analyzeMessage(text: string): Promise<Partial<PersonaProfile>> {
-    const pipe = await getSentimentPipeline();
-    const result = await pipe(text);
-    
-    // SST-2 returns labels like 'POSITIVE' or 'NEGATIVE'
-    const sentiment = result[0].label === 'POSITIVE' ? result[0].score : -result[0].score;
-    
-    // Heuristic formality check: length, punctuation, specific words
+    let sentiment: number;
+
+    if (sentimentModelReady && sentimentPipeline) {
+      try {
+        const result = await sentimentPipeline(text);
+        // SST-2 returns labels like 'POSITIVE' or 'NEGATIVE'
+        sentiment = result[0].label === 'POSITIVE' ? result[0].score : -result[0].score;
+      } catch (e) {
+        console.warn('[PersonaEngine] Sentiment inference failed, using heuristic:', (e as any)?.message);
+        sentiment = heuristicSentiment(text);
+      }
+    } else {
+      // Model not ready — use fast heuristic
+      sentiment = heuristicSentiment(text);
+    }
+
     const formality = this.estimateFormality(text);
-    
-    // Nuanced analysis: Emojis and Punctuation
     const emojiDensity = this.calculateEmojiDensity(text);
     const punctuationIntensity = this.calculatePunctuationIntensity(text);
-    
+
     return {
       sentiment,
       formality,
@@ -58,10 +85,9 @@ export class PersonaEngine {
   }
 
   private calculatePunctuationIntensity(text: string): number {
-    const intensityRegex =/[!?]{2,}|[!?]/g;
+    const intensityRegex = /[!?]{2,}|[!?]/g;
     const matches = text.match(intensityRegex);
     if (!matches) return 0;
-    
     let score = 0;
     for (const match of matches) {
       score += match.length > 1 ? 0.3 : 0.1;
@@ -87,8 +113,6 @@ export class PersonaEngine {
     const casualMarkers = /\b(hey|yo|lol|btw|u|r|gonna|wanna)\b/gi;
     const casualCount = (text.match(casualMarkers) || []).length;
     const wordCount = text.split(/\s+/).length;
-    
-    // Rough normalization
     return Math.max(0, 1 - (casualCount / (wordCount / 5)));
   }
 
@@ -100,12 +124,11 @@ export class PersonaEngine {
     const fDiff = Math.pow((p1.formality || 0) - (p2.formality || 0), 2);
     const eDiff = Math.pow((p1.emojiDensity || 0) - (p2.emojiDensity || 0), 2);
     const pDiff = Math.pow((p1.punctuationIntensity || 0) - (p2.punctuationIntensity || 0), 2);
-    
     return Math.sqrt(sDiff + fDiff + eDiff + pDiff);
   }
 
   /**
-   * Generates a adaptive response prefix based on current persona state.
+   * Generates an adaptive response prefix based on current persona state.
    */
   getAdaptiveResponse(baseText: string, profile: Partial<PersonaProfile>): string {
     const sentiment = profile.sentiment || 0;
@@ -113,12 +136,11 @@ export class PersonaEngine {
 
     let prefix = '';
     if (sentiment > 0.6) {
-      prefix = formality > 0.7 ? "I am delighted to report that " : "Awesome news! ";
+      prefix = formality > 0.7 ? "I am delighted to report that " : "Awesome! ";
     } else if (sentiment < -0.4) {
-      prefix = formality > 0.7 ? "Regrettably, " : "I'm sorry to say, but ";
+      prefix = formality > 0.7 ? "Regrettably, " : "I sense some tension — ";
     }
 
-    // Tone integration
     if (profile.tone === 'somber') {
       return `${prefix}${baseText.charAt(0).toLowerCase()}${baseText.slice(1)} (I sense you're feeling a bit down).`;
     }

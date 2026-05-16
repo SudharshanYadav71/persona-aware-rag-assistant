@@ -94,18 +94,7 @@ const authenticateToken = (req: any, res: any, next: any) => {
 const personaEngine = new PersonaEngine();
 const memoryStore = new MemoryStore();
 
-// Trigger Training if model is missing
-async function ensureModels() {
-  if (!fs.existsSync('./models/intent_model.json')) {
-    console.log("Intent model missing. Training on large synthetic dataset...");
-    try {
-        await trainIntentClassifier();
-    } catch (e) {
-        console.error("Training failed", e);
-    }
-  }
-}
-ensureModels();
+// Training is handled non-blocking in startServer()
 
 // Sync logic: periodically push new local memories to Firestore
 async function syncToFirebase(userId: string) {
@@ -599,18 +588,6 @@ app.get("/api/test-pipeline", async (req, res) => {
 });
 
 async function startServer() {
-  // Only train if the model file doesn't already exist (avoids slow re-training on every cold start)
-  if (!fs.existsSync('./models/intent_model.json')) {
-    console.log("[Startup] Intent model not found — training now...");
-    try {
-      await trainIntentClassifier();
-    } catch (e) {
-      console.error("[Startup] Training failed:", e);
-    }
-  } else {
-    console.log("[Startup] Intent model found — skipping training.");
-  }
-
   // Register health + favicon BEFORE the SPA wildcard so they are reachable in production
   app.get("/favicon.ico", (_req, res) => {
     res.status(204).end();
@@ -635,8 +612,19 @@ async function startServer() {
     });
   }
 
+  // Start listening IMMEDIATELY — do not wait for model training
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`[Server] Running on http://localhost:${PORT}`);
+
+    // Train intent model in background AFTER server is up
+    if (!fs.existsSync('./models/intent_model.json')) {
+      console.log('[Startup] Intent model not found — training in background...');
+      trainIntentClassifier()
+        .then(() => console.log('[Startup] Intent model training complete.'))
+        .catch((e) => console.error('[Startup] Training failed:', e));
+    } else {
+      console.log('[Startup] Intent model found — skipping training.');
+    }
   });
 }
 

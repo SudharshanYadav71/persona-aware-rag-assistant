@@ -21,18 +21,36 @@ export enum Intent {
 
 let extractor: any = null;
 let intentModel: any = null;
+let embeddingModelReady = false;
+
+// Load embedding model in background — never block requests
+(async () => {
+  try {
+    extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+    embeddingModelReady = true;
+    console.log('[IntentClassifier] Embedding model loaded.');
+  } catch (e) {
+    console.warn('[IntentClassifier] Embedding model unavailable:', (e as any)?.message);
+  }
+})();
 
 export async function getExtractor() {
-  if (!extractor) {
-    extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
-  }
   return extractor;
 }
 
 export async function getEmbedding(text: string): Promise<number[]> {
-  const model = await getExtractor();
-  const output = await model(text, { pooling: 'mean', normalize: true });
-  return Array.from(output.data);
+  if (!embeddingModelReady || !extractor) {
+    // Return zero vector as fallback when model not ready
+    return new Array(384).fill(0);
+  }
+  try {
+    const model = extractor;
+    const output = await model(text, { pooling: 'mean', normalize: true });
+    return Array.from(output.data);
+  } catch (e) {
+    console.warn('[IntentClassifier] Embedding failed:', (e as any)?.message);
+    return new Array(384).fill(0);
+  }
 }
 
 function cosineSimilarity(v1: number[], v2: number[]): number {
@@ -81,7 +99,13 @@ export async function classifyIntent(text: string): Promise<{ intent: Intent; co
     return { intent: Intent.GREETING, confidence: 0.99 };
   }
 
-  // Load model if not loaded
+  // If embedding model not ready, fall back to unknown — rule-based handles common cases
+  if (!embeddingModelReady || !extractor) {
+    console.warn('[Classifier] Embedding model not ready, returning UNKNOWN for centroid match');
+    return { intent: Intent.UNKNOWN, confidence: 0.1 };
+  }
+
+  // Load saved model if not loaded
   if (!intentModel) {
     try {
       if (fs.existsSync('./models/intent_model.json')) {
@@ -92,32 +116,37 @@ export async function classifyIntent(text: string): Promise<{ intent: Intent; co
     }
   }
 
-  const embedding = await getEmbedding(cleanText);
-  
-  let bestIntent = Intent.UNKNOWN;
-  let maxScore = -1;
+  try {
+    const embedding = await getEmbedding(cleanText);
+    
+    let bestIntent = Intent.UNKNOWN;
+    let maxScore = -1;
 
-  // Use centroids if available
-  if (intentModel && intentModel.centroids) {
-    for (const [label, centroid] of Object.entries(intentModel.centroids)) {
-      const score = cosineSimilarity(embedding, centroid as number[]);
-      if (score > maxScore) {
-        maxScore = score;
-        bestIntent = label as Intent;
+    // Use centroids if available
+    if (intentModel && intentModel.centroids) {
+      for (const [label, centroid] of Object.entries(intentModel.centroids)) {
+        const score = cosineSimilarity(embedding, centroid as number[]);
+        if (score > maxScore) {
+          maxScore = score;
+          bestIntent = label as Intent;
+        }
       }
     }
+
+    // Final confidence mapping (logistic-like)
+    const confidence = 1 / (1 + Math.exp(-10 * (maxScore - 0.45)));
+
+    console.log(`[Classifier] Query: "${text}" | Winner: ${bestIntent} | Raw Score: ${maxScore.toFixed(3)} | Confidence: ${(confidence * 100).toFixed(1)}%`);
+
+    if (maxScore < 0.25) {
+      return { intent: Intent.UNKNOWN, confidence: confidence };
+    }
+
+    return { intent: bestIntent, confidence: confidence };
+  } catch (e) {
+    console.error('[Classifier] Classification error:', e);
+    return { intent: Intent.UNKNOWN, confidence: 0 };
   }
-
-  // Final confidence mapping (logistic-like)
-  const confidence = 1 / (1 + Math.exp(-10 * (maxScore - 0.45))); // Slightly adjusted threshold
-
-  console.log(`[Classifier] Query: "${text}" | Winner: ${bestIntent} | Raw Score: ${maxScore.toFixed(3)} | Confidence: ${(confidence * 100).toFixed(1)}%`);
-
-  if (maxScore < 0.25) {
-    return { intent: Intent.UNKNOWN, confidence: confidence };
-  }
-
-  return { intent: bestIntent, confidence: confidence };
 }
 
 /**
