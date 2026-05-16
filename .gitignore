@@ -8,6 +8,5 @@ coverage/
 !.env.example
 .cache/
 data/
-models/
 test.db
 server_log*.txt
