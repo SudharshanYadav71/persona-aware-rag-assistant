@@ -173,11 +173,23 @@ export default function App() {
       });
       
       if (res.status === 401 || res.status === 403) return handleLogout();
+
       const data = await res.json();
+      
+      // Handle server errors gracefully with a meaningful message
+      if (!res.ok || data.error) {
+        const errMsg: Message = {
+          role: 'assistant',
+          content: `System Notice: ${data.error || 'The cognitive engine encountered an error. Please try again in a moment.'}`,
+          metadata: data
+        };
+        setMessages(prev => [...prev, errMsg]);
+        return;
+      }
       
       const assistantMsg: Message = { 
         role: 'assistant', 
-        content: data.adaptiveResponse || `Intent: ${data.intent?.intent || 'unknown'} (${Math.round((data.intent?.confidence || 0) * 100)}%)\nPersona: ${data.persona?.traits?.join(', ') || 'neutral'}`,
+        content: data.adaptiveResponse || `Processed. Intent: ${data.intent?.intent || 'unknown'} (${Math.round((data.intent?.confidence || 0) * 100)}% confidence)`,
         metadata: data
       };
       

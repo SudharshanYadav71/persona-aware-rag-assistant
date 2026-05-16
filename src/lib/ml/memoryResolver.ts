@@ -162,8 +162,15 @@ export class MemoryStore {
   async addMemory(memory: Omit<Memory, 'embedding' | 'importanceScore' | 'layer' | 'decayRate'>) {
     console.log(`[Memory Store] STORE MEMORY CALLED: "${memory.content.slice(0, 50)}..."`);
     
-    const embedding = await getEmbedding(memory.content);
-    console.log(`[Memory Store] EMBEDDING GENERATED (${embedding.length} dimensions)`);
+    // Resilient embedding — zero-vector fallback if model not ready yet
+    let embedding: number[];
+    try {
+      embedding = await getEmbedding(memory.content);
+      console.log(`[Memory Store] EMBEDDING GENERATED (${embedding.length} dimensions)`);
+    } catch (e) {
+      console.warn(`[Memory Store] Embedding failed (model loading?), using zero-vector fallback:`, (e as any)?.message);
+      embedding = new Array(384).fill(0); // MiniLM-L6-v2 is 384-dim
+    }
     
     const importanceScore = this.calculateImportance(memory.content, memory.emotionalWeight);
     
@@ -203,8 +210,17 @@ export class MemoryStore {
   async searchMemories(query: string, userId: string, limit = 5): Promise<any[]> {
     console.log(`[Memory Store] RETRIEVAL STARTED | Query: "${query}"`);
     
-    const queryEmbed = await getEmbedding(query);
-    const queryEmbedding = new Float32Array(queryEmbed);
+    // Resilient embedding — keyword-only fallback if model not ready
+    let queryEmbedding: Float32Array;
+    let embeddingAvailable = true;
+    try {
+      const queryEmbed = await getEmbedding(query);
+      queryEmbedding = new Float32Array(queryEmbed);
+    } catch (e) {
+      console.warn(`[Memory Store] Query embedding failed, falling back to keyword-only ranking:`, (e as any)?.message);
+      queryEmbedding = new Float32Array(384).fill(0);
+      embeddingAvailable = false;
+    }
     
     const memories = db.prepare(`
       SELECT id, content, embedding, timestamp, emotionalWeight, importanceScore, layer, tags 
@@ -219,13 +235,10 @@ export class MemoryStore {
       return [];
     }
 
-    const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+    const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
     const now = Date.now();
 
     const scored = memories.map(m => {
-      const mEmbedding = new Float32Array(m.embedding.buffer, m.embedding.byteOffset, m.embedding.byteLength / 4);
-      const similarity = fastCosineSimilarity(queryEmbedding, mEmbedding);
-      
       const importanceValue = this.getDecay(m);
       const ageInDays = (now - m.timestamp) / (1000 * 60 * 60 * 24);
       const recencyScore = Math.max(0, 1 - (ageInDays / 30));
@@ -235,9 +248,21 @@ export class MemoryStore {
       for (const word of queryWords) {
         if (textLower.includes(word)) overlap++;
       }
-      const keywordScore = Math.min(1, overlap / 3);
+      const keywordScore = queryWords.length > 0 ? Math.min(1, overlap / Math.max(1, queryWords.length)) : 0;
 
-      const finalScore = (0.40 * similarity) + (0.25 * keywordScore) + (0.20 * recencyScore) + (0.15 * importanceValue);
+      let similarity = 0;
+      // Only compute cosine similarity if embedding is valid (non-zero)
+      if (embeddingAvailable && m.embedding && m.embedding.byteLength > 0) {
+        try {
+          const mEmbedding = new Float32Array(m.embedding.buffer, m.embedding.byteOffset, m.embedding.byteLength / 4);
+          similarity = fastCosineSimilarity(queryEmbedding, mEmbedding);
+        } catch { similarity = 0; }
+      }
+
+      // Weighted scoring: use embedding when available, keyword-heavy fallback otherwise
+      const finalScore = embeddingAvailable
+        ? (0.40 * similarity) + (0.30 * keywordScore) + (0.20 * recencyScore) + (0.10 * importanceValue)
+        : (0.60 * keywordScore) + (0.30 * recencyScore) + (0.10 * importanceValue);
       
       return {
         ...m,
