@@ -22,9 +22,10 @@ export enum Intent {
 let extractor: any = null;
 let intentModel: any = null;
 let embeddingModelReady = false;
+let embeddingModelPromise: Promise<void> | null = null;
 
 // Load embedding model in background — never block requests
-(async () => {
+embeddingModelPromise = (async () => {
   try {
     extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
     embeddingModelReady = true;
@@ -33,6 +34,12 @@ let embeddingModelReady = false;
     console.warn('[IntentClassifier] Embedding model unavailable:', (e as any)?.message);
   }
 })();
+
+export async function waitForEmbeddingModel() {
+  if (embeddingModelPromise) {
+    await embeddingModelPromise;
+  }
+}
 
 export async function getExtractor() {
   return extractor;

@@ -5,7 +5,7 @@ import { classifyIntent, getExtractor, trainIntentClassifier, Intent } from "./s
 import { PersonaEngine } from "./src/lib/ml/personaEngine";
 import { MemoryStore, db } from "./src/lib/ml/memoryResolver";
 import crypto from "crypto";
-import admin from "firebase-admin";
+import { initializeApp, cert, applicationDefault, getApps, App } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import fs from "fs";
 import {
@@ -24,7 +24,7 @@ if (!fs.existsSync('./models')) fs.mkdirSync('./models');
 
 // Load Firebase Config — support both file-based (local) and env-var-based (Render/production)
 let firebaseConfig: any = {};
-let adminApp: admin.app.App | undefined;
+let adminApp: App | undefined;
 let fbDb: any;
 
 try {
@@ -37,25 +37,25 @@ try {
       projectId: serviceAccount.project_id,
       firestoreDatabaseId: process.env.FIRESTORE_DATABASE_ID || '(default)'
     };
-    if (admin.apps.length === 0) {
-      adminApp = admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
+    if (getApps().length === 0) {
+      adminApp = initializeApp({
+        credential: cert(serviceAccount),
         projectId: serviceAccount.project_id
       });
     } else {
-      adminApp = admin.apps[0]!;
+      adminApp = getApps()[0] as App;
     }
     fbDb = getFirestore(adminApp, firebaseConfig.firestoreDatabaseId);
     console.log(`[Firebase] Initialized via env var for project: ${firebaseConfig.projectId}`);
   } else if (fs.existsSync("./firebase-applet-config.json")) {
     firebaseConfig = JSON.parse(fs.readFileSync("./firebase-applet-config.json", "utf-8"));
-    if (admin.apps.length === 0) {
-      adminApp = admin.initializeApp({
-        credential: admin.credential.applicationDefault(),
+    if (getApps().length === 0) {
+      adminApp = initializeApp({
+        credential: applicationDefault(),
         projectId: firebaseConfig.projectId
       });
     } else {
-      adminApp = admin.apps[0]!;
+      adminApp = getApps()[0] as App;
     }
     fbDb = getFirestore(adminApp, firebaseConfig.firestoreDatabaseId);
     console.log(`[Firebase] Initialized via config file for project: ${firebaseConfig.projectId} | DB: ${firebaseConfig.firestoreDatabaseId}`);
@@ -619,9 +619,12 @@ async function startServer() {
     // Train intent model in background AFTER server is up
     if (!fs.existsSync('./models/intent_model.json')) {
       console.log('[Startup] Intent model not found — training in background...');
-      trainIntentClassifier()
-        .then(() => console.log('[Startup] Intent model training complete.'))
-        .catch((e) => console.error('[Startup] Training failed:', e));
+      import('./src/lib/ml/intentClassifier').then(async ({ trainIntentClassifier, waitForEmbeddingModel }) => {
+        await waitForEmbeddingModel();
+        trainIntentClassifier()
+          .then(() => console.log('[Startup] Intent model training complete.'))
+          .catch((e) => console.error('[Startup] Training failed:', e));
+      });
     } else {
       console.log('[Startup] Intent model found — skipping training.');
     }
